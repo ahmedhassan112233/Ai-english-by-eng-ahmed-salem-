@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Delta English Exam | Master Edition</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;500;700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+
+    <style>
+        :root {
+            --bg-core: #050505;
+            --primary: #00f0ff;
+            --accent: #7000ff;
+            --success: #00ffa3;
+            --danger: #ff0055;
+            --glass: rgba(20, 20, 30, 0.75);
+            --glass-solid: rgba(20, 20, 30, 0.95);
+            --border: rgba(255, 255, 255, 0.1);
+            --font-ui: 'Outfit', sans-serif;
+            --font-code: 'JetBrains Mono', monospace;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; }
+
+        body {
+            background: var(--bg-core);
+            color: #fff;
+            font-family: var(--font-ui);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* --- Background Animation --- */
+        #canvas-container {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 0;
+            background: radial-gradient(circle at center, #1a1a2e 0%, #000 100%);
+        }
+
+        /* --- Screens Management --- */
+        .screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; align-items: center; justify-content: center;
+            z-index: 10;
+            opacity: 0; pointer-events: none; transition: 0.5s ease;
+            backdrop-filter: blur(10px);
+        }
+        .screen.active { opacity: 1; pointer-events: all; backdrop-filter: none; }
+
+        /* --- LOBBY SCREEN --- */
+        .lobby-card {
+            width: 90%; max-width: 500px;
+            background: var(--glass-solid);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 40px;
+            text-align: center;
+            box-shadow: 0 0 50px rgba(0,240,255,0.1);
+            transform: translateY(20px); animation: floatUp 0.6s forwards;
+        }
+
+        @keyframes floatUp { to { transform: translateY(0); } }
+
+        .lobby-title { font-size: 32px; font-weight: 900; margin-bottom: 10px; color: #fff; text-transform: uppercase; letter-spacing: 1px; }
+        .lobby-subtitle { color: #889; margin-bottom: 30px; font-size: 14px; }
+
+        .config-group { margin-bottom: 25px; text-align: left; }
+        .config-label { font-size: 12px; color: var(--primary); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; display: block; font-weight: 700; }
+        
+        .option-selector { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+        .time-btn {
+            background: rgba(255,255,255,0.05); border: 1px solid var(--border);
+            color: #ccc; padding: 12px; border-radius: 8px; cursor: pointer; transition: 0.2s; font-family: var(--font-code); font-size: 13px;
+        }
+        .time-btn:hover { background: rgba(255,255,255,0.1); }
+        .time-btn.selected { background: var(--primary); color: #000; font-weight: bold; border-color: var(--primary); box-shadow: 0 0 15px rgba(0,240,255,0.4); }
+
+        .start-btn {
+            width: 100%; padding: 16px; background: linear-gradient(90deg, var(--accent), var(--primary));
+            border: none; border-radius: 12px; color: #fff; font-size: 18px; font-weight: 700;
+            cursor: pointer; text-transform: uppercase; letter-spacing: 2px; margin-top: 10px;
+            transition: 0.3s;
+        }
+        .start-btn:hover { transform: scale(1.02); box-shadow: 0 0 30px rgba(112,0,255,0.5); }
+
+        /* --- EXAM SCREEN --- */
+        .app-layout {
+            display: flex; gap: 20px; width: 95%; max-width: 1400px; height: 90vh;
+        }
+
+        /* Sidebar */
+        aside {
+            flex: 0 0 300px;
+            background: var(--glass);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            display: flex; flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .timer-box {
+            background: rgba(0,0,0,0.3); padding: 20px; text-align: center;
+            border-bottom: 1px solid var(--border);
+        }
+        .timer-val { font-family: var(--font-code); font-size: 32px; font-weight: 700; color: #fff; }
+        .timer-label { font-size: 10px; color: #888; text-transform: uppercase; letter-spacing: 2px; margin-top: 5px; }
+        .timer-val.warning { color: var(--danger); animation: pulse 1s infinite; }
+
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+
+        .grid-container { flex: 1; overflow-y: auto; padding: 15px; }
+        .q-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+        .grid-item {
+            aspect-ratio: 1; background: rgba(255,255,255,0.05); border: 1px solid var(--border);
+            border-radius: 6px; display: flex; align-items: center; justify-content: center;
+            font-family: var(--font-code); font-size: 11px; cursor: pointer; color: #888;
+        }
+        .grid-item.active { border-color: var(--primary); color: #fff; background: rgba(0,240,255,0.1); }
+        .grid-item.answered { background: rgba(255,255,255,0.2); color: #fff; }
+        
+        .grid-item.correct { background: var(--success) !important; color: #000; }
+        .grid-item.wrong { background: var(--danger) !important; color: #fff; }
+        .grid-item.flagged { border-color: var(--warning); color: var(--warning); }
+
+        /* Main Quiz Area */
+        .quiz-area { flex: 1; display: flex; flex-direction: column; position: relative; }
+        
+        .top-bar {
+            display: flex; justify-content: space-between; align-items: center;
+            background: var(--glass); padding: 10px 20px; border-radius: 15px; margin-bottom: 15px;
+            border: 1px solid var(--border);
+        }
+
+        /* 3D Switch Styles */
+        .toggle-wrapper { display: flex; align-items: center; gap: 10px; }
+        .toggle-label { font-size: 12px; color: #ccc; font-weight: 500; }
+        .switch { position: relative; display: inline-block; width: 40px; height: 20px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #333; transition: .4s; border-radius: 20px; }
+        .slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: var(--primary); }
+        input:checked + .slider:before { transform: translateX(20px); }
+
+        .card-container {
+            flex: 1; perspective: 1000px; position: relative; display: flex; align-items: center; justify-content: center;
+        }
+        
+        .question-card {
+            width: 100%; max-width: 800px;
+            background: rgba(20, 20, 30, 0.85); backdrop-filter: blur(30px);
+            border: 1px solid rgba(255,255,255,0.1); border-radius: 24px; padding: 40px;
+            transform-style: preserve-3d; transition: transform 0.1s ease-out;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+        }
+        
+        /* Class to stop motion */
+        .question-card.static { transform: none !important; transition: none; }
+
+        .q-text { font-size: 22px; margin-bottom: 30px; line-height: 1.5; font-weight: 500; }
+        
+        .options-list { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .opt-btn {
+            background: rgba(255,255,255,0.03); border: 1px solid var(--border);
+            padding: 18px; border-radius: 12px; color: #ccc; cursor: pointer;
+            display: flex; align-items: center; gap: 12px; transition: 0.2s;
+        }
+        .opt-key {
+            width: 28px; height: 28px; background: rgba(255,255,255,0.1); border-radius: 6px;
+            display: flex; align-items: center; justify-content: center; font-family: var(--font-code); font-size: 12px;
+        }
+        
+        .opt-btn:hover { background: rgba(0,240,255,0.1); border-color: var(--primary); }
+        .opt-btn.selected { background: rgba(0,240,255,0.2); border-color: var(--primary); color: #fff; }
+        .opt-btn.correct { background: rgba(0,255,163,0.2) !important; border-color: var(--success) !important; }
+        .opt-btn.wrong { background: rgba(255,0,85,0.2) !important; border-color: var(--danger) !important; }
+
+        .controls { margin-top: 20px; display: flex; justify-content: space-between; }
+        .action-btn {
+            padding: 10px 25px; border-radius: 30px; border: none; font-weight: 700; cursor: pointer;
+            display: flex; align-items: center; gap: 8px; transition: 0.2s;
+        }
+        .btn-submit { background: var(--danger); color: #fff; }
+        .btn-next { background: var(--primary); color: #000; }
+
+        /* --- RESULTS SCREEN --- */
+        .results-card {
+            width: 90%; max-width: 800px;
+            background: var(--glass-solid); border: 1px solid var(--border); border-radius: 24px;
+            padding: 40px; display: flex; flex-direction: column; gap: 30px;
+            max-height: 90vh; overflow-y: auto;
+        }
+
+        .result-header { text-align: center; }
+        .score-big { font-size: 60px; font-weight: 900; color: var(--primary); font-family: var(--font-code); line-height: 1; }
+        .score-label { color: #889; text-transform: uppercase; letter-spacing: 2px; }
+
+        .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
+        .stat-item { background: rgba(255,255,255,0.05); padding: 20px; border-radius: 12px; text-align: center; }
+        .stat-val { font-size: 24px; font-weight: 700; display: block; margin-bottom: 5px; }
+        .stat-name { font-size: 12px; color: #888; text-transform: uppercase; }
+
+        .btn-review { background: var(--accent); color: #fff; width: 100%; padding: 15px; border:none; border-radius: 12px; font-weight: 700; cursor: pointer; margin-top: 10px; }
+
+        /* --- Mobile --- */
+        @media (max-width: 900px) {
+            .app-layout { flex-direction: column; height: 100vh; width: 100%; gap: 0; }
+            aside { width: 100%; height: auto; border:none; border-bottom: 1px solid var(--border); flex-direction: row; align-items: center; padding: 10px; }
+            .timer-box { padding: 5px 15px; border: none; text-align: left; }
+            .timer-val { font-size: 20px; }
+            .grid-container { display: none; }
+            .question-card { padding: 20px; border: none; background: transparent; box-shadow: none; }
+            .options-list { grid-template-columns: 1fr; }
+            .q-text { font-size: 18px; }
+            .lobby-card { width: 95%; padding: 25px; }
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="canvas-container"></div>
+
+    <!-- 1. LOBBY SCREEN -->
+    <div class="screen active" id="screen-lobby">
+        <div class="lobby-card">
+            <div class="lobby-title">Delta Exam</div>
+            <div class="lobby-subtitle">English Proficiency Test Bank (144 Questions)</div>
+
+            <div class="config-group">
+                <span class="config-label">Select Duration</span>
+                <div class="option-selector" id="time-selector">
+                    <div class="time-btn" onclick="setTime(null, this)">No Limit</div>
+                    <div class="time-btn selected" onclick="setTime(15, this)">15 Min</div>
+                    <div class="time-btn" onclick="setTime(30, this)">30 Min</div>
+                    <div class="time-btn" onclick="setTime(60, this)">60 Min</div>
+                    <div class="time-btn" onclick="setTime(90, this)">90 Min</div>
+                    <div class="time-btn" onclick="setTime(5, this)">Blitz (5m)</div>
+                </div>
+            </div>
+
+            <div class="config-group">
+                <span class="config-label">Feedback Mode</span>
+                <div class="option-selector" style="grid-template-columns: 1fr 1fr;">
+                    <div class="time-btn selected" onclick="setMode('practice', this)">Practice (Sounds On)</div>
+                    <div class="time-btn" onclick="setMode('exam', this)">Exam (Silent)</div>
+                </div>
+            </div>
+
+            <button class="start-btn" onclick="startExam()">Start Exam</button>
+        </div>
+    </div>
+
+    <!-- 2. EXAM SCREEN -->
+    <div class="screen" id="screen-exam">
+        <div class="app-layout">
+            <aside>
+                <div class="timer-box">
+                    <div class="timer-val" id="timer-display">00:00</div>
+                    <div class="timer-label">Time Remaining</div>
+                </div>
+                <div class="grid-container">
+                    <div class="q-grid" id="q-grid">
+                        <!-- JS Generated -->
+                    </div>
+                </div>
+            </aside>
+
+            <div class="quiz-area">
+                <div class="top-bar">
+                    <div style="font-family: var(--font-code); color: #888;">Question <span id="q-curr" style="color:#fff; font-weight:bold">1</span> / 144</div>
+                    
+                    <!-- 3D Toggle Switch (Restored) -->
+                    <div class="toggle-wrapper">
+                        <span class="toggle-label">3D FX</span>
+                        <label class="switch">
+                            <input type="checkbox" id="motion-toggle" checked onchange="toggleMotion(this)">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="card-container">
+                    <div class="question-card" id="q-card">
+                        <div class="q-text" id="q-text">Loading...</div>
+                        <div class="options-list" id="opt-list"></div>
+                        
+                        <div class="controls">
+                            <button class="action-btn btn-submit" onclick="finishExam()">
+                                <i class="ri-stop-circle-line"></i> Finish
+                            </button>
+                            <button class="action-btn btn-next" id="next-btn" onclick="nextQuestion()">
+                                Next <i class="ri-arrow-right-line"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. RESULTS SCREEN -->
+    <div class="screen" id="screen-results">
+        <div class="results-card">
+            <div class="result-header">
+                <div class="score-label">Final Score</div>
+                <div class="score-big"><span id="res-score">0</span><span style="font-size:30px; color:#666">/1440</span></div>
+                <div style="color:var(--primary); font-family:var(--font-code); margin-top:5px;" id="res-percent">0%</div>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <span class="stat-val" style="color:var(--success)" id="res-correct">0</span>
+                    <span class="stat-name">Correct</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-val" style="color:var(--danger)" id="res-wrong">0</span>
+                    <span class="stat-name">Mistakes</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-val" style="color:#888" id="res-skipped">0</span>
+                    <span class="stat-name">Unanswered</span>
+                </div>
+            </div>
+
+            <button class="btn-review" onclick="enterReviewMode()">Review Answers</button>
+            <button class="time-btn" onclick="location.reload()" style="width:100%; text-align:center;">Back to Lobby</button>
+        </div>
+    </div>
+
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <script>
+        // ============================
+        // 1. DATA (Full 144 Questions)
+        // ============================
+        const questionBank = [
+             { id: 1, q: "The person who decides which student can go to a university or college is ...", options: ["chancellor", "Course administrator", "admission officer", "Fresher"], ans: 1 }, 
+            { id: 2, q: "I ... pancakes on Saturdays and Sundays.", options: ["am eating", "was eating", "eaten", "eat"], ans: 3 }, 
+            { id: 3, q: "The baseball player’s malice toward the referee was revealed in his spiteful remarks. 'Spiteful' means:", options: ["vindictive", "crazy", "rude", "unpleasant"], ans: 0 }, 
+            { id: 4, q: "'In brief' is a phrase that should be included in the ...", options: ["Argumentation", "Body", "Conclusion", "Introduction"], ans: 2 }, 
+            { id: 5, q: "Although Zachary is inexperienced, he obdurately refuses to withdraw. 'Obdurately' means:", options: ["foolishly", "reluctantly", "constantly", "stubbornly"], ans: 3 }, 
+            { id: 6, q: "His neighbor’s superficial remarks trivialized the dispute. Synonym of 'superficial':", options: ["enraged", "petty", "insulting", "misleading"], ans: 1 }, 
+            { id: 7, q: "'However' is a phrase that should be used in ...", options: ["Consequence", "Continuation", "Contradiction", "Simultaneity"], ans: 2 }, 
+            { id: 8, q: "She showed a blatant disregard for the rules. Synonym for 'blatant':", options: ["obvious", "hidden", "last-minute", "rebellious"], ans: 0 }, 
+            { id: 9, q: "What does the idiom 'run on fumes' mean?", options: ["to be happy", "to be active", "to be excited", "to be exhausted"], ans: 3 }, 
+            { id: 10, q: "What does the idiom 'sold me out' mean?", options: ["to keep my secret", "to be loyal", "to be honest", "to let my secret out"], ans: 3 }, 
+            { id: 11, q: "What does the idiom 'it’s a no brainer' mean?", options: ["difficult decision", "hard decision", "tough decision", "easy decision"], ans: 3 }, 
+            { id: 12, q: "The captain delegated responsibility. 'Delegated' means:", options: ["analyzed", "respected", "criticized", "assigned"], ans: 3 }, 
+            { id: 13, q: "A student in their first year at university or college is a ...", options: ["chancellor", "lecturer", "course administrator", "fresher"], ans: 3 }, 
+            { id: 14, q: "The theory had been fortified by new research. 'Fortified' means:", options: ["reinforced", "altered", "disputed", "developed"], ans: 0 }, 
+            { id: 15, q: "The public was apathetic about the verdict. 'Apathetic' means:", options: ["enraged", "indifferent", "suspicious", "saddened"], ans: 1 }, 
+            { id: 16, q: "Her outfit was usually flamboyant. Synonym of 'flamboyant':", options: ["impeccable", "showy", "sloppy", "unassuming"], ans: 1 }, 
+            { id: 17, q: "His review was meticulous. 'Meticulous' means:", options: ["delicate", "painstaking", "superficial", "objective"], ans: 1 }, 
+            { id: 18, q: "The group presented its ultimatum. 'Ultimatum' means:", options: ["earnest plea", "formal petition", "solemn promise", "non-negotiable demand"], ans: 3 }, 
+            { id: 19, q: "He inferred from the evidence. 'Inferred' means:", options: ["predicted", "imagined", "surmised", "implied"], ans: 2 }, 
+            { id: 20, q: "The suspect gave a plausible explanation. 'Plausible' means:", options: ["unbelievable", "credible", "insufficient", "apologetic"], ans: 1 }, 
+            { id: 21, q: "The attorney wanted to expedite the process. 'Expedite' means:", options: ["accelerate", "evaluate", "reverse", "justify"], ans: 0 }, 
+            { id: 22, q: "That perfume evokes pleasant memories. 'Evokes' means:", options: ["angers", "erases", "calls up", "confuses"], ans: 2 }, 
+            { id: 23, q: "Methods to alleviate the situation were debated. 'Alleviate' means:", options: ["ease", "tolerate", "clarify", "intensify"], ans: 0 }, 
+            { id: 24, q: "A talk to teach a large group of students is a ...", options: ["lecture", "tuition", "term", "campus"], ans: 0 }, 
+            { id: 25, q: "The preacher used a euphemism. 'Euphemism' means:", options: ["ugly picture", "substituted word", "homeless person", "visual aid"], ans: 1 }, 
+            { id: 26, q: "The newspaper was inundated with calls. 'Inundated' means:", options: ["provided", "bothered", "rewarded", "flooded"], ans: 3 }, 
+            { id: 27, q: "Officials felt the need to augment the rules. 'Augment' means:", options: ["criticize", "retract", "consider", "expand"], ans: 3 }, 
+            { id: 28, q: "Mr. Powers was so gullible. Meaning of 'gullible'?", options: ["intelligent", "naïve", "dishonest", "critical"], ans: 1 }, 
+            { id: 29, q: "Completing the prerequisite assignment. Meaning of 'prerequisite'?", options: ["required", "optional", "preferred", "advisable"], ans: 0 }, 
+            { id: 30, q: "Charles is diligent about flossing. 'Diligent' means:", options: ["uncomfortable", "excited", "thorough", "ambivalent"], ans: 2 }, 
+            { id: 31, q: "'Don’t feel blue, every cloud has a silver lining'. Meaning:", options: ["it is going to rain", "the clouds look good", "it is going to be dark", "things will get better"], ans: 3 }, 
+            { id: 32, q: "She found his message ambiguous. Meaning of 'ambiguous'?", options: ["profound", "inspiring", "ridiculous", "unclear"], ans: 3 }, 
+            { id: 33, q: "Marcia delivered an animated speech. 'Animated' means:", options: ["abbreviated", "courteous", "reserved", "lively"], ans: 3 }, 
+            { id: 34, q: "The intermittent rain soaked the garden. 'Intermittent' means:", options: ["protracted", "periodic", "incredulous", "light"], ans: 1 }, 
+            { id: 35, q: "A period of time at a school or university (usually three). It is a ...", options: ["lecture", "tuition", "term", "campus"], ans: 2 }, 
+            { id: 36, q: "I got a vicarious thrill. Meaning of 'vicarious'?", options: ["shared", "unpleasant", "adventurous", "evil"], ans: 0 }, 
+            { id: 37, q: "Augment the rules (Repeated Q in source). 'Augment' means:", options: ["criticize", "retract", "consider", "expand"], ans: 3 }, 
+            { id: 38, q: "Inundated with calls (Repeated Q in source). 'Inundated' means:", options: ["provided", "bothered", "rewarded", "flooded"], ans: 3 }, 
+            { id: 39, q: "The doctor got to the crux of the issue. 'Crux' is:", options: ["outline", "opposite", "crucial point", "unhealthy"], ans: 2 }, 
+            { id: 40, q: "They were incredulous. Meaning of 'incredulous'?", options: ["fearful", "outraged", "convinced", "disbelieving"], ans: 3 }, 
+            { id: 41, q: "She was proficient in computers. 'Proficient' means:", options: ["sincere", "adequate", "competent", "skilled"], ans: 2 }, 
+            { id: 42, q: "'Because of this' is a phrase used in ...", options: ["Consequence", "Continuation", "Contradiction", "Simultaneity"], ans: 0 }, 
+            { id: 43, q: "'He is full of hot air'. This means he is ...", options: ["sincere", "persuasive", "bluffing", "honest"], ans: 2 }, 
+            { id: 44, q: "'Kick the bucket' means ...", options: ["to spill water", "to travel", "to die", "to survive"], ans: 2 }, 
+            { id: 45, q: "'Finally' is a phrase included in the ...", options: ["Argumentation", "Body", "Conclusion", "Introduction"], ans: 2 }, 
+            { id: 46, q: "Area containing main buildings of a university is the ...", options: ["lecture", "tuition", "campus", "club"], ans: 2 }, 
+            { id: 47, q: "Proficient (Repeated Q). 'Proficient' means:", options: ["adequate", "competent", "sincere", "skilled"], ans: 1 }, 
+            { id: 48, q: "Incredulous (Repeated Q). 'Incredulous' means:", options: ["convinced", "disbelieving", "fearful", "outraged"], ans: 1 }, 
+            { id: 49, q: "'In conclusion' is a phrase included in the ...", options: ["Argumentation", "Body", "Conclusion", "Introduction"], ans: 2 }, 
+            { id: 50, q: "The head of the university is a ...", options: ["lecture", "tuition", "term", "chancellor"], ans: 3 }, 
+            { id: 51, q: "Antonym of 'settle into':", options: ["move out", "stay", "live", "survive"], ans: 0 }, 
+            { id: 52, q: "Synonym of 'sort out':", options: ["mix up", "figure out", "mingle", "tangle"], ans: 1 }, 
+            { id: 53, q: "The person who organizes courses and office work is ...", options: ["Admission officer", "Course administrator", "Chancellor", "Fresher"], ans: 0 }, 
+            { id: 54, q: "To become a student in a course is to ...", options: ["withdraw", "enroll", "graduate", "exchange"], ans: 1 }, 
+            { id: 55, q: "To put your name on an official list is to ...", options: ["withdraw", "enroll", "graduate", "register"], ans: 3 }, 
+            { id: 56, q: "'I’m all ears'. This means he is ...", options: ["attentive", "not listening", "having big ears", "inattentive"], ans: 0 }, 
+            { id: 57, q: "Area containing main university buildings (Repeated):", options: ["term", "campus", "club", "school"], ans: 1 }, 
+            { id: 58, q: "'Lastly' is a phrase used in ...", options: ["Continuation", "Contradiction", "Ordering", "Simultaneity"], ans: 2 }, 
+            { id: 59, q: "'Kick the bucket' (Repeated) means:", options: ["spill water", "travel", "die", "survive"], ans: 2 }, 
+            { id: 60, q: "'Firstly' is a phrase used in ...", options: ["Continuation", "Ordering", "Simultaneity", "Contradiction"], ans: 1 }, 
+            { id: 61, q: "She is a 'swot'. This means:", options: ["Reads a lot", "Ridiculed for studying excessively", "Learns a job", "Diligent worker"], ans: 1 }, 
+            { id: 62, q: "'Therefore' is a phrase used in ...", options: ["Consequence", "Continuation", "Contradiction", "Simultaneity"], ans: 0 }, 
+            { id: 63, q: "A period of time at school (term) is a ...", options: ["lecture", "tuition", "term", "campus"], ans: 2 }, 
+            { id: 64, q: "'As is observed' is a phrase included in the ...", options: ["Argumentation", "Body", "Conclusion", "Introduction"], ans: 1 }, 
+            { id: 65, q: "'Then' is a phrase used in ...", options: ["Continuation", "Ordering", "Simultaneity", "Contradiction"], ans: 0 }, 
+            { id: 66, q: "'You live and learn'. This means:", options: ["Learn from memory", "Learn a job", "Discover something surprising", "Lifelong commitment"], ans: 2 }, 
+            { id: 67, q: "'Overall' is a phrase included in the ...", options: ["Argumentation", "Body", "Conclusion", "Introduction"], ans: 2 }, 
+            { id: 68, q: "'Moreover' is a phrase used in ...", options: ["Continuation", "Contradiction", "Ordering", "Simultaneity"], ans: 0 }, 
+            { id: 69, q: "Meaning of 'gullible' (Repeated):", options: ["intelligent", "naïve", "dishonest", "critical"], ans: 1 }, 
+            { id: 70, q: "Meaning of 'prerequisite' (Repeated):", options: ["required", "optional", "preferred", "advisable"], ans: 0 }, 
+            { id: 71, q: "Meaning of 'ambiguous' (Repeated):", options: ["profound", "inspiring", "ridiculous", "unclear"], ans: 3 }, 
+            { id: 72, q: "Marcia's 'animated' speech (Repeated):", options: ["abbreviated", "courteous", "reserved", "lively"], ans: 3 }, 
+            { id: 73, q: "'Intermittent' rain (Repeated):", options: ["protracted", "periodic", "incredulous", "light"], ans: 1 }, 
+            { id: 74, q: "'Vicarious' thrill (Repeated):", options: ["shared", "unpleasant", "adventurous", "evil"], ans: 0 }, 
+            { id: 75, q: "'Augment' rules (Repeated):", options: ["criticize", "retract", "consider", "expand"], ans: 3 }, 
+            { id: 76, q: "'Inundated' (Repeated):", options: ["provided", "bothered", "rewarded", "flooded"], ans: 3 }, 
+            { id: 77, q: "'Learnt by heart' means:", options: ["Say from memory", "Learn job", "Discover surprise", "Memorize quickly"], ans: 0 }, 
+            { id: 78, q: "'As a general trend' should be included in the ...", options: ["Argumentation", "Body", "Conclusion", "Introduction"], ans: 1 }, 
+            { id: 79, q: "'On the other hand' should be used in ...", options: ["Continuation", "Consequence", "Simultaneity", "Contradiction"], ans: 3 }, 
+            { id: 80, q: "Meaning of 'incredulous' (Repeated):", options: ["fearful", "outraged", "convinced", "disbelieving"], ans: 3 }, 
+            { id: 81, q: "Meaning of 'proficient' (Repeated):", options: ["sincere", "adequate", "competent", "skilled"], ans: 2 }, 
+            { id: 82, q: "Writing rule: You should ...", options: ["Avoid repetition", "Ignore punctuation", "Repeat words", "Use pronouns"], ans: 0 }, 
+            { id: 83, q: "We ... TV at the moment.", options: ["are watching", "was watching", "is watching", "watch"], ans: 0 }, 
+            { id: 84, q: "'In addition to' is used in ...", options: ["Continuation", "Contradiction", "Ordering", "Simultaneity"], ans: 0 }, 
+            { id: 85, q: "Do you ... to school on time?", options: ["getting", "got", "get", "have got"], ans: 2 }, 
+            { id: 86, q: "'Notwithstanding' is used in ...", options: ["Continuation", "Contradiction", "Ordering", "Simultaneity"], ans: 1 }, 
+            { id: 87, q: "'Thus' is used in ...", options: ["Consequence", "Continuation", "Contradiction", "Simultaneity"], ans: 0 }, 
+            { id: 88, q: "'Learning the ropes' means ...", options: ["Say from memory", "Learn how to do a job", "Discover surprise", "Gain experience"], ans: 1 }, 
+            { id: 89, q: "'As can be seen' is included in the ...", options: ["Argumentation", "Body", "Conclusion", "Introduction"], ans: 1 }, 
+            { id: 90, q: "'Piece of cake' means ...", options: ["delicious", "effortless", "difficult", "complicated"], ans: 1 }, 
+            { id: 91, q: "'Furthermore' is used in ...", options: ["Continuation", "Contradiction", "Ordering", "Simultaneity"], ans: 0 }, 
+            { id: 92, q: "'To sum up' is included in the ...", options: ["Argumentation", "Body", "Conclusion", "Introduction"], ans: 2 }, 
+            { id: 93, q: "When a trend remains constant, it is ...", options: ["Declining", "Dropping", "Slumping", "Stable"], ans: 3 }, 
+            { id: 94, q: "Period of time at school (Repeated):", options: ["lecture", "tuition", "term", "campus"], ans: 2 }, 
+            { id: 95, q: "Synonym of 'accommodation':", options: ["courses", "residence", "campus", "tuition"], ans: 1 }, 
+            { id: 96, q: "Synonym of 'worthwhile':", options: ["cheap", "valuable", "reasonable", "worthless"], ans: 1 }, 
+            { id: 97, q: "The figure which has lines is named ...", options: ["Bar chart", "Pie chart", "Table", "Line graph"], ans: 3 }, 
+            { id: 98, q: "The figure which has columns is named ...", options: ["Bar chart", "Pie chart", "Table", "Line graph"], ans: 2 }, 
+            { id: 99, q: "'Swot' idiom (Repeated):", options: ["Reads a lot", "Ridiculed student", "Learn job", "Diligent"], ans: 1 }, 
+            { id: 100, q: "The figure which has rows is named ...", options: ["Bar chart", "Pie chart", "Table", "Line graph"], ans: 2 }, 
+            { id: 101, q: "The figure which has segments or sections is named ...", options: ["Bar chart", "Pie chart", "Table", "Line graph"], ans: 1 }, 
+            { id: 102, q: "Trend changing between ups and downs is ...", options: ["Increasing", "Leveling off", "Slumping", "Fluctuating"], ans: 3 }, 
+            { id: 103, q: "When a trend is increasing, it is ...", options: ["Up soaring", "Leveling off", "Slumping", "Fluctuating"], ans: 0 }, 
+            { id: 104, q: "When a trend is decreasing, it is ...", options: ["Declining", "Leveling off", "Slumping", "Fluctuating"], ans: 0 }, 
+            { id: 105, q: "When a trend reaches the top, it arrives at the ...", options: ["Ground", "Peak", "Bottom", "Level"], ans: 1 }, 
+            { id: 106, q: "Antonym of 'settle into':", options: ["Move out", "Stay", "Live", "Survive"], ans: 0 }, 
+            { id: 107, q: "First rule when writing task 1 IELTS: write not less than ...", options: ["150 words", "250 words", "350 words", "450 words"], ans: 0 }, 
+            { id: 108, q: "First component in task 1 IELTS should be ...", options: ["Question", "Introduction", "Body", "Conclusion"], ans: 1 }, 
+            { id: 109, q: "Second component in task 1 IELTS should be ...", options: ["Question", "Introduction", "Body", "Conclusion"], ans: 2 }, 
+            { id: 110, q: "He is a 'bookworm'. This means:", options: ["Reads a lot", "Ridiculed student", "Learn job", "Diligent"], ans: 0 }, 
+            { id: 111, q: "Third component in task 1 IELTS should be ...", options: ["Question", "Introduction", "Body", "Conclusion"], ans: 3 }, 
+            { id: 112, q: "Introduction in task 1 IELTS should have ... components.", options: ["6", "5", "4", "3"], ans: 3 }, 
+            { id: 113, q: "First component in Introduction (Task 1) is ...", options: ["Major trend", "Purpose", "Location", "Date"], ans: 1 }, 
+            { id: 114, q: "Second component in Introduction (Task 1) is ...", options: ["Major trend", "Purpose", "Location", "Date"], ans: 2 }, 
+            { id: 115, q: "Third component in Introduction (Task 1) is ...", options: ["Major trend", "Purpose", "Location", "Date"], ans: 3 }, 
+            { id: 116, q: "Synonym of 'sort out' (Repeated):", options: ["mix up", "figure out", "mingle", "tangle"], ans: 1 }, 
+            { id: 117, q: "First component in Body (Task 1) is ...", options: ["General trend", "Conclusion", "Minor trends", "Purpose"], ans: 0 }, 
+            { id: 118, q: "Second component in Body (Task 1) is ...", options: ["General trend", "Conclusion", "Minor trends", "Purpose"], ans: 2 }, 
+            { id: 119, q: "Conclusion of task 1 should give the reader a ...", options: ["Argumentation", "Persuasion", "Interrogation", "Summarization"], ans: 3 }, 
+            { id: 120, q: "'The table shows the comparison of...' is in the ...", options: ["Introduction", "Body", "Conclusion", "Argumentation"], ans: 0 }, 
+            { id: 121, q: "She ... English everyday.", options: ["is studying", "was studying", "studies", "studied"], ans: 2 }, 
+            { id: 122, q: "'As is presented' is included in the ...", options: ["Introduction", "Body", "Introduction", "Argumentation"], ans: 1 }, 
+            { id: 123, q: "'As a general trend' is included in the ...", options: ["Argumentation", "Body", "Conclusion", "Argumentation"], ans: 1 }, 
+            { id: 124, q: "'To sum up' is included in the ...", options: ["Introduction", "Body", "Conclusion", "Argumentation"], ans: 2 }, 
+            { id: 125, q: "'Sitting on the fence' means he is ...", options: ["biased", "attentive", "neutral", "careful"], ans: 2 }, 
+            { id: 126, q: "Meaning of 'outmoded':", options: ["unnecessary", "out-of-date", "foreign", "illegal"], ans: 1 }, 
+            { id: 127, q: "'Accordingly' is used in ...", options: ["Consequence", "Continuation", "Contradiction", "Simultaneity"], ans: 0 }, 
+            { id: 128, q: "'In conclusion' is included in the ...", options: ["Introduction", "Body", "Conclusion", "Argumentation"], ans: 2 }, 
+            { id: 129, q: "'Firstly' is used in ...", options: ["Continuation", "Ordering", "Simultaneity", "Contradiction"], ans: 1 }, 
+            { id: 130, q: "'Secondly' is used in ...", options: ["Continuation", "Ordering", "Simultaneity", "Contradiction"], ans: 1 }, 
+            { id: 131, q: "'Moreover' is used in ...", options: ["Continuation", "Contradiction", "Ordering", "Simultaneity"], ans: 0 }, 
+            { id: 132, q: "I ... my homework right now.", options: ["do", "does", "am doing", "was doing"], ans: 2 }, 
+            { id: 133, q: "'In addition to' is used in ...", options: ["Continuation", "Contradiction", "Ordering", "Simultaneity"], ans: 0 }, 
+            { id: 134, q: "Meaning of 'covert':", options: ["dangerous", "hidden", "foreign", "illegal"], ans: 1 }, 
+            { id: 135, q: "'Then' is used in ...", options: ["Continuation", "Ordering", "Simultaneity", "Contradiction"], ans: 0 }, 
+            { id: 136, q: "'Because of this' is used in ...", options: ["Continuation", "Consequence", "Simultaneity", "Contradiction"], ans: 1 }, 
+            { id: 137, q: "'Therefore' is used in ...", options: ["Continuation", "Consequence", "Simultaneity", "Contradiction"], ans: 1 }, 
+            { id: 138, q: "'Thus' is used in ...", options: ["Continuation", "Consequence", "Simultaneity", "Contradiction"], ans: 1 }, 
+            { id: 139, q: "'Accordingly' is used in ...", options: ["Continuation", "Consequence", "Simultaneity", "Contradiction"], ans: 1 }, 
+            { id: 140, q: "'On the other hand' is used in ...", options: ["Continuation", "Consequence", "Simultaneity", "Contradiction"], ans: 3 }, 
+            { id: 141, q: "'Notwithstanding' is used in ...", options: ["Continuation", "Consequence", "Simultaneity", "Contradiction"], ans: 3 }, 
+            { id: 142, q: "'Nevertheless' is used in ...", options: ["Continuation", "Consequence", "Simultaneity", "Contradiction"], ans: 3 }, 
+            { id: 143, q: "Use bullets while writing a paragraph?", options: ["true", "false"], ans: 1 }, 
+            { id: 144, q: "Earth's climate fluctuates (change often). True or False?", options: ["false", "true"], ans: 1 }
+        ];
+
+        // ============================
+        // 2. STATE VARIABLES
+        // ============================
+        let config = {
+            duration: 15, // Minutes (null = unlimited)
+            mode: 'practice' // 'practice' (instant feedback & sound) or 'exam' (silent, no feedback)
+        };
+
+        let state = {
+            currentIdx: 0,
+            answers: new Array(144).fill(null), // null=unanswered, index=choice
+            startTime: null,
+            timerInterval: null,
+            isReviewMode: false,
+            timeRemaining: 0,
+            motionEnabled: true
+        };
+
+        // DOM Elements
+        const screens = {
+            lobby: document.getElementById('screen-lobby'),
+            exam: document.getElementById('screen-exam'),
+            results: document.getElementById('screen-results')
+        };
+        
+        const qGrid = document.getElementById('q-grid');
+        const qCard = document.getElementById('q-card');
+
+        // ============================
+        // 3. LOGIC FUNCTIONS
+        // ============================
+
+        function setTime(min, btn) {
+            config.duration = min;
+            document.querySelectorAll('#time-selector .time-btn').forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+        }
+
+        function setMode(m, btn) {
+            config.mode = m;
+            btn.parentElement.querySelectorAll('.time-btn').forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+        }
+
+        function switchScreen(id) {
+            Object.values(screens).forEach(s => s.classList.remove('active'));
+            screens[id].classList.add('active');
+        }
+
+        function toggleMotion(checkbox) {
+            state.motionEnabled = checkbox.checked;
+            if(!state.motionEnabled) {
+                qCard.classList.add('static');
+            } else {
+                qCard.classList.remove('static');
+            }
+        }
+
+        function startExam() {
+            state.answers = new Array(144).fill(null);
+            state.currentIdx = 0;
+            state.isReviewMode = false;
+            
+            // Setup Timer
+            if(config.duration) {
+                state.timeRemaining = config.duration * 60;
+                document.getElementById('timer-display').innerText = formatTime(state.timeRemaining);
+                state.timerInterval = setInterval(updateTimer, 1000);
+            } else {
+                document.getElementById('timer-display').innerText = "--:--";
+            }
+
+            renderGrid();
+            renderQuestion();
+            switchScreen('exam');
+        }
+
+        function updateTimer() {
+            state.timeRemaining--;
+            const display = document.getElementById('timer-display');
+            display.innerText = formatTime(state.timeRemaining);
+            
+            if(state.timeRemaining <= 60) display.classList.add('warning');
+            
+            if(state.timeRemaining <= 0) {
+                clearInterval(state.timerInterval);
+                finishExam();
+            }
+        }
+
+        function formatTime(seconds) {
+            const m = Math.floor(seconds / 60);
+            const s = seconds % 60;
+            return `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+        }
+
+        function renderGrid() {
+            qGrid.innerHTML = '';
+            questionBank.forEach((q, i) => {
+                const item = document.createElement('div');
+                item.className = 'grid-item';
+                item.innerText = i + 1;
+                
+                if(i === state.currentIdx) item.classList.add('active');
+                
+                const ans = state.answers[i];
+                if(ans !== null) {
+                    if(state.isReviewMode || config.mode === 'practice') {
+                        if(ans === q.ans) item.classList.add('correct');
+                        else item.classList.add('wrong');
+                    } else {
+                        item.classList.add('answered');
+                    }
+                } else if(state.isReviewMode) {
+                    item.classList.add('flagged'); // Unanswered in review
+                }
+
+                item.onclick = () => {
+                    state.currentIdx = i;
+                    renderQuestion();
+                    renderGrid();
+                }
+                qGrid.appendChild(item);
+            });
+        }
+
+        function renderQuestion() {
+            const q = questionBank[state.currentIdx];
+            document.getElementById('q-curr').innerText = state.currentIdx + 1;
+            document.getElementById('q-text').innerText = q.q;
+            
+            const list = document.getElementById('opt-list');
+            list.innerHTML = '';
+
+            const keys = ['A', 'B', 'C', 'D'];
+            const userAns = state.answers[state.currentIdx];
+            const isAnswered = userAns !== null;
+
+            q.options.forEach((opt, idx) => {
+                const btn = document.createElement('div');
+                btn.className = 'opt-btn';
+                btn.innerHTML = `<div class="opt-key">${keys[idx]}</div> ${opt}`;
+                
+                // Logic for styling
+                if(state.isReviewMode || (config.mode === 'practice' && isAnswered)) {
+                    // Reveal Phase
+                    if(idx === q.ans) btn.classList.add('correct');
+                    if(userAns === idx && idx !== q.ans) btn.classList.add('wrong');
+                    if(userAns === idx) btn.classList.add('selected'); // Show what user picked
+                    btn.style.cursor = 'default';
+                } else if(config.mode === 'exam' && isAnswered) {
+                    // Hidden Phase
+                    if(userAns === idx) btn.classList.add('selected');
+                } else {
+                    // Active Phase
+                    btn.onclick = () => handleAnswer(idx);
+                }
+
+                list.appendChild(btn);
+            });
+
+            // Card Animation Reset
+            qCard.style.transform = 'translateY(10px)';
+            qCard.style.opacity = '0.5';
+            setTimeout(() => {
+                qCard.style.transform = 'translateY(0)';
+                qCard.style.opacity = '1';
+            }, 50);
+        }
+
+        function handleAnswer(idx) {
+            if(state.isReviewMode) return;
+            
+            // Save Answer
+            state.answers[state.currentIdx] = idx;
+            
+            // Sound Logic (Only in Practice Mode)
+            if(config.mode === 'practice') {
+                const q = questionBank[state.currentIdx];
+                if(idx === q.ans) playSound('success');
+                else playSound('error');
+            }
+
+            // Re-render to show feedback if practice
+            renderQuestion();
+            renderGrid(); // update sidebar
+        }
+
+        function nextQuestion() {
+            if(state.currentIdx < questionBank.length - 1) {
+                state.currentIdx++;
+                renderQuestion();
+                renderGrid();
+            }
+        }
+
+        function finishExam() {
+            clearInterval(state.timerInterval);
+            
+            // Calc Stats
+            let correct = 0;
+            let wrong = 0;
+            let skipped = 0;
+            
+            state.answers.forEach((ans, i) => {
+                if(ans === null) skipped++;
+                else if(ans === questionBank[i].ans) correct++;
+                else wrong++;
+            });
+
+            const score = correct * 10;
+            const pct = Math.round((correct / questionBank.length) * 100);
+
+            // Populate Results
+            document.getElementById('res-score').innerText = score;
+            document.getElementById('res-percent').innerText = `${pct}% Performance`;
+            document.getElementById('res-correct').innerText = correct;
+            document.getElementById('res-wrong').innerText = wrong;
+            document.getElementById('res-skipped').innerText = skipped;
+
+            switchScreen('results');
+        }
+
+        function enterReviewMode() {
+            state.isReviewMode = true;
+            state.currentIdx = 0;
+            document.querySelector('.controls').style.display = 'none'; // Hide submit button
+            renderGrid();
+            renderQuestion();
+            switchScreen('exam');
+        }
+
+        // ============================
+        // 4. AUDIO SYSTEM
+        // ============================
+        function playSound(type) {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            
+            if (type === 'success') {
+                osc.frequency.setValueAtTime(600, ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.1);
+            } else {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(300, ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(100, ctx.currentTime + 0.2);
+            }
+
+            gain.gain.setValueAtTime(0.1, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+
+            osc.start();
+            osc.stop(ctx.currentTime + 0.3);
+        }
+
+        // ============================
+        // 5. VISUALS (Three.js & Tilt)
+        // ============================
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({alpha:true});
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+        const particles = new THREE.BufferGeometry();
+        const cnt = 600;
+        const pos = new Float32Array(cnt*3);
+        for(let i=0; i<cnt*3; i++) pos[i] = (Math.random()-0.5)*50;
+        particles.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+        const mat = new THREE.PointsMaterial({size:0.04, color:0x00f0ff});
+        const mesh = new THREE.Points(particles, mat);
+        scene.add(mesh);
+        camera.position.z = 10;
+
+        function animate() {
+            requestAnimationFrame(animate);
+            mesh.rotation.y += 0.0005;
+            renderer.render(scene, camera);
+        }
+        animate();
+        
+        // 3D Tilt Logic
+        document.addEventListener('mousemove', (e) => {
+            if(!state.motionEnabled) return; // Stop if toggle is off
+            
+            if(document.getElementById('screen-exam').classList.contains('active')) {
+                const x = (window.innerWidth / 2 - e.pageX) / 40;
+                const y = (window.innerHeight / 2 - e.pageY) / 40;
+                qCard.style.transform = `rotateY(${x}deg) rotateX(${y}deg)`;
+            }
+        });
+
+    </script>
+</body>
+</html>
